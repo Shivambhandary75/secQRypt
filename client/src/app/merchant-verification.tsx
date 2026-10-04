@@ -1,7 +1,7 @@
 import { CameraView, useCameraPermissions, type BarcodeScanningResult } from 'expo-camera';
 import * as Crypto from 'expo-crypto';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -19,6 +19,7 @@ const CameraViewComponent = CameraView as unknown as React.ComponentType<any>;
 export default function MerchantVerificationScreen() {
   const router = useRouter();
   const [merchantName, setMerchantName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [upiId, setUpiId] = useState('');
   const [shopLocation, setShopLocation] = useState('');
   const [locationSuggestions, setLocationSuggestions] = useState<LocationSuggestion[]>([]);
@@ -33,13 +34,11 @@ export default function MerchantVerificationScreen() {
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const scanLinePosition = useRef(new Animated.Value(0)).current;
+  const [scanLinePosition] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     const query = shopLocation.trim();
     if (query.length < 3) {
-      setLocationSuggestions([]);
-      setLocationLoading(false);
       return;
     }
 
@@ -81,11 +80,19 @@ export default function MerchantVerificationScreen() {
     };
   }, [shopLocation]);
 
+  function handleShopLocationChange(value: string) {
+    setShopLocation(value);
+    if (value.trim().length < 3) {
+      setLocationSuggestions([]);
+      setLocationLoading(false);
+    }
+  }
+
   async function submit() {
     setError('');
 
-    if (!merchantName.trim() || !upiId.trim() || !shopLocation.trim() || !govId.trim() || !qrData.trim() || !qrHash.trim()) {
-      setError('Merchant details, government ID, and a camera-scanned QR code are required.');
+    if (!merchantName.trim() || !phoneNumber.trim() || !upiId.trim() || !shopLocation.trim() || !govId.trim() || !qrData.trim() || !qrHash.trim()) {
+      setError('Merchant details, phone number, government ID, and a camera-scanned QR code are required.');
       return;
     }
 
@@ -94,6 +101,7 @@ export default function MerchantVerificationScreen() {
     try {
       await applyMerchantVerification({
         merchantName: merchantName.trim(),
+        phoneNumber: phoneNumber.trim(),
         upiId: upiId.trim(),
         shopLocation: shopLocation.trim(),
         govId: govId.trim(),
@@ -179,10 +187,15 @@ export default function MerchantVerificationScreen() {
           </View>
 
           <View>
+            <Text className="text-xs font-bold uppercase tracking-wider text-white">Merchant Phone Number</Text>
+            <TextInput value={phoneNumber} onChangeText={setPhoneNumber} placeholder="+91 98765 43210" placeholderTextColor="#777777" keyboardType="phone-pad" className="mt-2 rounded-lg border border-white bg-black px-4 py-3 text-white" />
+          </View>
+
+          <View>
             <Text className="text-xs font-bold uppercase tracking-wider text-white">Shop Location</Text>
             <TextInput
               value={shopLocation}
-              onChangeText={setShopLocation}
+              onChangeText={handleShopLocationChange}
               placeholder="Start typing a city or address"
               placeholderTextColor="#777777"
               autoCorrect={false}

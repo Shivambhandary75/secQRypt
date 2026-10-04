@@ -12,6 +12,7 @@ function serializeRecord(record) {
     id: record._id.toString(),
     merchantId: record.merchantId,
     merchantName: record.merchantName,
+    phoneNumber: record.phoneNumber,
     upiId: record.upiId,
     shopLocation: record.shopLocation,
     govId: record.govId,
@@ -66,6 +67,25 @@ router.post('/report', requireAuth, async (req, res, next) => {
   }
 });
 
+router.get('/reports/mine', requireAuth, async (req, res, next) => {
+  try {
+    const reports = await MerchantReport.find({ reportedBy: req.user.sub }).sort({ createdAt: -1 });
+    return res.json({ reports: reports.map((report) => ({
+      id: report._id.toString(),
+      merchantId: report.merchantId || '',
+      merchantName: report.merchantName || '',
+      merchantUpiId: report.merchantUpiId || '',
+      reportReason: report.reportReason,
+      details: report.details || '',
+      status: report.status,
+      adminNotes: report.adminNotes || '',
+      createdAt: report.createdAt,
+    })) });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get('/status', requireAuth, async (req, res, next) => {
   try {
     const user = await User.findById(req.user.sub);
@@ -90,9 +110,9 @@ router.post('/apply', requireAuth, async (req, res, next) => {
       return res.status(403).json({ message: 'Merchant access required' });
     }
 
-    const { merchantName, upiId, shopLocation, qrData, qrHash, govId, notes } = req.body || {};
-    if (!merchantName || !upiId || !shopLocation || !qrData || !qrHash || !govId) {
-      return res.status(400).json({ message: 'Merchant name, UPI ID, shop location, government ID, scanned QR data, and QR hash are required' });
+    const { merchantName, phoneNumber, upiId, shopLocation, qrData, qrHash, govId, notes } = req.body || {};
+    if (!merchantName || !phoneNumber || !upiId || !shopLocation || !qrData || !qrHash || !govId) {
+      return res.status(400).json({ message: 'Merchant name, phone number, UPI ID, shop location, government ID, scanned QR data, and QR hash are required' });
     }
 
     const normalizedQrData = String(qrData).trim();
@@ -105,6 +125,7 @@ router.post('/apply', requireAuth, async (req, res, next) => {
       merchantAccountId: user._id,
       merchantId: user.merchantId,
       merchantName: String(merchantName).trim(),
+      phoneNumber: String(phoneNumber).trim(),
       upiId: String(upiId).trim(),
       shopLocation: String(shopLocation).trim(),
       govId: String(govId).trim(),
@@ -210,6 +231,7 @@ router.post('/qr', async (req, res, next) => {
       qrHash: calculatedQrHash,
       merchantName: exactMatch.merchantName,
       merchantId: exactMatch.merchantId,
+      phoneNumber: exactMatch.phoneNumber,
       upiId: exactMatch.upiId,
       shopLocation: exactMatch.shopLocation,
       message: 'Verified merchant details matched the registered QR record.',

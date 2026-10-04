@@ -73,6 +73,8 @@ export default function AuthScreen() {
   }
 
   const fieldClass = 'mt-2 rounded-lg border border-white bg-black px-4 py-3 text-white';
+  const roleIcon = role === 'merchant' ? 'storefront.fill' : role === 'admin' ? 'person.badge.shield.checkmark.fill' : 'person.2.fill';
+  const roleLabel = role === 'merchant' ? 'Merchant' : role === 'admin' ? 'Government / Admin' : 'Consumer';
 
   return (
     <View className="flex-1 bg-black">
@@ -83,6 +85,10 @@ export default function AuthScreen() {
         </Pressable>
 
         <View className="flex-1 justify-center p-7">
+          <View className="mb-4 flex-row items-center self-start rounded-xl border border-white bg-white px-3 py-2">
+            <SymbolView name={{ ios: roleIcon, android: role === 'merchant' ? 'storefront' : role === 'admin' ? 'admin_panel_settings' : 'people', web: roleIcon } as never} size={18} tintColor="#000000" />
+            <Text className="ml-2 text-xs font-extrabold uppercase tracking-wider text-black">{roleLabel}</Text>
+          </View>
           <Text className="text-[11px] font-extrabold tracking-[2px] text-white">{role === 'merchant' ? 'MERCHANT ACCESS' : role === 'admin' ? 'GOVERNMENT / ADMIN ACCESS' : 'CONSUMER ACCESS'}</Text>
           <Text className="mt-3 text-[38px] font-extrabold leading-[44px] text-white">{mode === 'login' ? 'Welcome back.' : 'Create your account.'}</Text>
           <Text className="mt-4 text-base leading-6 text-white/70">{role === 'admin' ? 'Review merchant applications and reports securely.' : mode === 'login' ? 'Log in to continue to your secure dashboard.' : 'Register to start using secQRypt securely.'}</Text>

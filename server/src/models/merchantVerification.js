@@ -5,6 +5,7 @@ const merchantVerificationSchema = new mongoose.Schema(
     merchantAccountId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true, index: true },
     merchantId: { type: String, required: true, trim: true, uppercase: true },
     merchantName: { type: String, required: true, trim: true },
+    phoneNumber: { type: String, required: true, trim: true },
     upiId: { type: String, required: true, trim: true },
     shopLocation: { type: String, required: true, trim: true },
     govId: { type: String, trim: true },

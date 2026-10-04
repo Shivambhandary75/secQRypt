@@ -9,6 +9,7 @@ export type MerchantVerificationRecord = {
   id: string;
   merchantId: string;
   merchantName: string;
+  phoneNumber: string;
   upiId: string;
   shopLocation: string;
   govId?: string;
@@ -20,6 +21,18 @@ export type MerchantVerificationRecord = {
 };
 
 export type MerchantReportReason = 'scam' | 'spam' | 'mismatch' | 'other';
+
+export type ConsumerReport = {
+  id: string;
+  merchantId: string;
+  merchantName: string;
+  merchantUpiId: string;
+  reportReason: MerchantReportReason;
+  details: string;
+  status: 'new' | 'reviewing' | 'resolved' | 'dismissed';
+  adminNotes?: string;
+  createdAt?: string;
+};
 
 function getApiUrl() {
   if (process.env.EXPO_PUBLIC_API_URL) return process.env.EXPO_PUBLIC_API_URL;
@@ -60,6 +73,7 @@ export async function getMerchantStatus() {
 
 export async function applyMerchantVerification(payload: {
   merchantName: string;
+  phoneNumber: string;
   upiId: string;
   shopLocation: string;
   govId: string;
@@ -108,6 +122,14 @@ export async function submitMerchantReport(payload: {
   });
 }
 
+export async function getMyMerchantReports() {
+  const token = await getToken();
+  return request<{ reports: ConsumerReport[] }>('/api/merchant/reports/mine', {
+    method: 'GET',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+}
+
 export async function verifyQr(payload: { qrData: string; qrHash: string }) {
   return request<{
     verified: boolean;
@@ -116,6 +138,7 @@ export async function verifyQr(payload: { qrData: string; qrHash: string }) {
     qrHash?: string;
     merchantName?: string;
     merchantId?: string;
+    phoneNumber?: string;
     upiId?: string;
     shopLocation?: string;
   }>('/api/verify/qr', {

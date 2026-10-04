@@ -7,6 +7,8 @@ import { Animated, Easing, Pressable, Text, TextInput, View } from 'react-native
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { submitMerchantReport, verifyQr } from '@/services/merchant';
+import { getSession } from '@/services/auth';
+import { saveScanHistory } from '@/services/history';
 
 const CameraViewComponent = CameraView as unknown as ComponentType<any>;
 
@@ -27,6 +29,7 @@ export default function ScannerScreen() {
     message: string;
     merchantName?: string;
     merchantId?: string;
+    phoneNumber?: string;
     upiId?: string;
     shopLocation?: string;
   }>(null);
@@ -42,12 +45,28 @@ export default function ScannerScreen() {
     try {
       const response = await verifyQr({ qrData: cleaned, qrHash });
       setResult(response);
+      const session = await getSession();
+      if (session) {
+        await saveScanHistory(session.id, {
+          qrHash,
+          verified: response.verified,
+          status: response.status,
+          message: response.message,
+          merchantName: response.merchantName,
+          merchantId: response.merchantId,
+          phoneNumber: response.phoneNumber,
+          shopLocation: response.shopLocation,
+        });
+      }
     } catch (error) {
-      setResult({
+      const failedResult = {
         verified: false,
         status: 'error',
         message: error instanceof Error ? error.message : 'Unable to verify QR.',
-      });
+      };
+      setResult(failedResult);
+      const session = await getSession();
+      if (session) await saveScanHistory(session.id, { qrHash, ...failedResult });
     }
   };
 
@@ -154,6 +173,7 @@ export default function ScannerScreen() {
                 <Text className="mt-2 text-[10px] font-extrabold tracking-[1px] text-green-700">VERIFIED MERCHANT</Text>
                 <Text className="mt-2 text-[27px] font-extrabold text-black">{result.merchantName}</Text>
                 <Text className="mt-2 text-sm text-black/70">Merchant ID: {result.merchantId}</Text>
+                <Text className="text-sm text-black/70">Phone: {result.phoneNumber}</Text>
                 <Text className="text-sm text-black/70">UPI ID: {result.upiId}</Text>
                 <Text className="text-sm text-black/70">Location: {result.shopLocation}</Text>
                 <Text className="mt-4 text-sm font-extrabold text-green-700">Status: {result.status}</Text>

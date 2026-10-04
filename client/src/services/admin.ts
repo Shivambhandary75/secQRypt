@@ -22,6 +22,7 @@ export type VerificationQueueItem = {
   merchantAccountId: string;
   merchantId: string;
   merchantName: string;
+  phoneNumber: string;
   upiId: string;
   shopLocation: string;
   qrData: string;

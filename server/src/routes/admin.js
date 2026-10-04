@@ -12,6 +12,7 @@ function serializeVerification(record) {
     merchantAccountId: record.merchantAccountId?.toString?.() || record.merchantAccountId,
     merchantId: record.merchantId,
     merchantName: record.merchantName,
+    phoneNumber: record.phoneNumber || '',
     upiId: record.upiId,
     shopLocation: record.shopLocation,
     qrData: record.qrData,

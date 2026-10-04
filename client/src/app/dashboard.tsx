@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { LogOut, QrCode, ShieldCheck, Store, UserRound, type LucideIcon } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, BackHandler, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { decideVerification, getAdminOverview, getMerchantReports, getVerificationQueue, resolveMerchantReport } from '@/services/admin';
 import { getSession, getToken, logout, type AuthUser } from '@/services/auth';
-import { getMerchantStatus, removeMerchantVerification, type MerchantVerificationRecord, type MerchantVerificationStatus } from '@/services/merchant';
+import { getMerchantStatus, getMyMerchantReports, removeMerchantVerification, type ConsumerReport, type MerchantVerificationRecord, type MerchantVerificationStatus } from '@/services/merchant';
+import { getScanHistory, type ScanHistoryItem } from '@/services/history';
 
 export default function DashboardScreen() {
   const router = useRouter();
@@ -21,6 +22,20 @@ export default function DashboardScreen() {
   const [adminReports, setAdminReports] = useState<any[]>([]);
   const [adminActionError, setAdminActionError] = useState('');
   const [merchantActionError, setMerchantActionError] = useState('');
+  const [scanHistory, setScanHistory] = useState<ScanHistoryItem[]>([]);
+  const [consumerReports, setConsumerReports] = useState<ConsumerReport[]>([]);
+
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      Alert.alert('Exit secQRypt?', 'Do you want to exit the app?', [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Exit', style: 'destructive', onPress: () => BackHandler.exitApp() },
+      ]);
+      return true;
+    });
+
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     getSession().then(async (session) => {
@@ -31,6 +46,15 @@ export default function DashboardScreen() {
       }
 
       setUser(session);
+
+      if (session.role === 'consumer') {
+        const [scans, reports] = await Promise.all([
+          getScanHistory(session.id),
+          getMyMerchantReports(),
+        ]);
+        setScanHistory(scans);
+        setConsumerReports(reports.reports || []);
+      }
 
       if (session.role === 'merchant') {
         try {
@@ -128,7 +152,8 @@ export default function DashboardScreen() {
 
   return (
     <View className="flex-1 bg-black">
-      <SafeAreaView className="mx-auto w-full max-w-3xl flex-1 p-7">
+      <SafeAreaView className="mx-auto w-full max-w-3xl flex-1">
+        <ScrollView className="flex-1" contentContainerClassName="p-7">
         <View className="mt-3 flex-row items-center justify-between">
           <View>
               <Text className="text-[10px] font-extrabold tracking-[2px] text-white">
@@ -142,21 +167,14 @@ export default function DashboardScreen() {
               onPress={() => setMenuOpen((open) => !open)}
               className="h-12 w-12 items-center justify-center rounded-full bg-white"
             >
-              <SymbolView
-                name={{
-                  ios: isMerchant ? 'storefront.fill' : isAdmin ? 'shield.fill' : 'person.fill',
-                  android: isMerchant ? 'storefront' : isAdmin ? 'shield' : 'person',
-                  web: isMerchant ? 'storefront.fill' : isAdmin ? 'shield.fill' : 'person',
-                } as never}
-                size={21}
-                tintColor="#000000"
-              />
+              {isMerchant ? <Store size={21} color="#000000" /> : isAdmin ? <ShieldCheck size={21} color="#000000" /> : <UserRound size={21} color="#000000" />}
             </Pressable>
 
             {menuOpen && (
-              <View className="absolute right-0 top-14 w-40 rounded-xl border border-white bg-black p-2 shadow-lg">
-                <Pressable onPress={handleLogout} className="rounded-lg px-3 py-2 active:opacity-80">
-                  <Text className="text-sm font-semibold text-red-400">Log out</Text>
+              <View style={{ position: 'absolute', right: 0, top: 58, width: 176, zIndex: 1000, elevation: 20 }} className="rounded-xl border border-white bg-black p-2 shadow-lg">
+                <Pressable onPress={handleLogout} className="min-h-12 flex-row items-center gap-3 rounded-lg px-3 py-2 active:opacity-80">
+                  <LogOut size={19} color="#f87171" />
+                  <Text className="flex-1 text-sm font-semibold text-red-400">Log out</Text>
                 </Pressable>
               </View>
             )}
@@ -235,6 +253,7 @@ export default function DashboardScreen() {
                       Status: {record.verificationStatus === 'approved' ? 'verified' : record.verificationStatus === 'rejected' ? 'invalid' : record.verificationStatus}
                     </Text>
                     <Text className="text-xs text-black/70">Merchant ID: {record.merchantId}</Text>
+                    <Text className="text-xs text-black/70">Phone: {record.phoneNumber}</Text>
                     <Text className="text-xs text-black/70">UPI: {record.upiId}</Text>
                     <Text className="text-xs text-black/70">Gov ID: {record.govId}</Text>
                     <Text className="text-xs text-black/70">QR: {record.qrData}</Text>
@@ -279,59 +298,62 @@ export default function DashboardScreen() {
         )}
 
         {!isMerchant && !isAdmin && (
-          <View className="mt-8 rounded-xl border border-white bg-black p-[22px]">
-            <Text className="text-[10px] font-extrabold tracking-[1px] text-white/70">SECURE BALANCE</Text>
-            <Text className="mt-3 text-4xl font-extrabold text-white">$2,480.00</Text>
-            <View className="mt-3 flex-row items-center gap-2">
-              <SymbolView name={{ ios: 'arrow.up.right', android: 'arrow_upward', web: 'arrow_upward' } as never} size={15} tintColor="#FFFFFF" />
-              <Text className="text-xs font-bold text-white">8.2% this month</Text>
-            </View>
-          </View>
+          <>
+            <Text className="mb-3 mt-7 text-lg font-extrabold text-white">Scan before paying</Text>
+            <DashboardAction icon={QrCode} label="Scan QR" onPress={() => router.push('/scanner')} />
+
+            <Text className="mb-3 mt-8 text-lg font-extrabold text-white">Scan history</Text>
+            {scanHistory.length === 0 ? (
+              <Text className="text-sm text-white/60">Your QR checks will appear here.</Text>
+            ) : scanHistory.map((scan) => (
+              <View key={scan.id} className="mb-3 rounded-xl border border-white bg-black p-4">
+                <View className="flex-row items-center justify-between gap-3">
+                  <Text className={`text-sm font-extrabold ${scan.verified ? 'text-green-400' : 'text-red-400'}`}>
+                    {scan.verified ? 'Verified merchant' : 'QR not verified'}
+                  </Text>
+                  <Text className="text-[10px] text-white/50">{formatHistoryDate(scan.scannedAt)}</Text>
+                </View>
+                <Text className="mt-2 text-sm text-white">{scan.merchantName || scan.message}</Text>
+                {scan.merchantId ? <Text className="mt-1 text-xs text-white/65">Merchant ID: {scan.merchantId}</Text> : null}
+                {scan.phoneNumber ? <Text className="text-xs text-white/65">Phone: {scan.phoneNumber}</Text> : null}
+                {scan.shopLocation ? <Text className="text-xs text-white/65">Location: {scan.shopLocation}</Text> : null}
+                <Text className="mt-2 text-[10px] uppercase tracking-wider text-white/45">Result: {scan.status}</Text>
+              </View>
+            ))}
+
+            <Text className="mb-3 mt-8 text-lg font-extrabold text-white">Report history</Text>
+            {consumerReports.length === 0 ? (
+              <Text className="text-sm text-white/60">Reports you submit will appear here.</Text>
+            ) : consumerReports.map((report) => (
+              <View key={report.id} className="mb-3 rounded-xl border border-white bg-black p-4">
+                <View className="flex-row items-center justify-between gap-3">
+                  <Text className="text-sm font-extrabold uppercase text-white">{report.reportReason}</Text>
+                  <Text className="text-xs font-bold text-amber-300">{report.status}</Text>
+                </View>
+                <Text className="mt-2 text-sm text-white">{report.merchantName || report.merchantId || 'Unidentified merchant'}</Text>
+                {report.details ? <Text className="mt-1 text-xs leading-5 text-white/65">{report.details}</Text> : null}
+                {report.adminNotes ? <Text className="mt-2 text-xs text-white/80">Government note: {report.adminNotes}</Text> : null}
+                <Text className="mt-2 text-[10px] text-white/45">{report.createdAt ? formatHistoryDate(report.createdAt) : 'Submitted report'}</Text>
+              </View>
+            ))}
+          </>
         )}
-
-        <Text className="mb-3 mt-7 text-lg font-extrabold text-white">Quick actions</Text>
-        <View className="flex-row gap-2.5">
-          <DashboardAction
-            icon="qrcode.viewfinder"
-            label={isMerchant ? 'Verification' : isAdmin ? 'Review queue' : 'Scan QR'}
-            onPress={() => router.push(isMerchant ? '/merchant-verification?role=merchant' : isAdmin ? '/dashboard?role=admin' : '/scanner')}
-          />
-          <DashboardAction icon="clock.arrow.circlepath" label="Activity" />
-          <DashboardAction icon="shield.checkered" label="Security" />
-        </View>
-
-        <View className="mt-7 flex-row items-center justify-between">
-          <Text className="text-lg font-extrabold text-white">Recent activity</Text>
-          <Text className="text-xs font-bold text-white/70">View all</Text>
-        </View>
-
-        <View className="mt-3 flex-row items-center gap-3 rounded-xl border border-white bg-black p-4">
-          <SymbolView
-            name={{ ios: 'checkmark.shield.fill', android: 'verified', web: 'checkmark.shield.fill' } as never}
-            size={24}
-            tintColor="#FFFFFF"
-          />
-          <View className="flex-1">
-            <Text className="text-sm font-extrabold text-white">
-              {isMerchant ? 'Verification review' : 'Payment secured'}
-            </Text>
-            <Text className="mt-1 text-xs text-white/70">{isMerchant ? 'Updated from your merchant profile' : 'Verified against your payment list'}</Text>
-          </View>
-          <Text className="text-sm font-extrabold text-white">
-            {isMerchant ? (isVerified ? 'Verified' : 'Pending') : '$24.00'}
-          </Text>
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </View>
   );
 }
 
+function formatHistoryDate(value: string) {
+  return new Date(value).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+}
+
 function DashboardAction({
-  icon,
+  icon: Icon,
   label,
   onPress,
 }: {
-  icon: string;
+  icon: LucideIcon;
   label: string;
   onPress?: () => void;
 }) {
@@ -342,7 +364,7 @@ function DashboardAction({
       onPress={onPress}
       className="min-h-[86px] flex-1 items-center justify-center gap-2 rounded-xl border border-white bg-black"
     >
-      <SymbolView name={{ ios: icon, android: icon, web: icon } as never} size={24} tintColor="#FFFFFF" />
+      <Icon size={24} color="#FFFFFF" />
       <Text className="text-xs font-bold text-white">{label}</Text>
     </Pressable>
   );
