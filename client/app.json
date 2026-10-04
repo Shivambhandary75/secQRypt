@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "SecQrypt",
+    "slug": "secQrypt",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/images/secQRypt_logo.png",
+    "scheme": "secqrypt",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "icon": "./assets/expo.icon"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/secQRypt_logo.png",
+        "backgroundColor": "#000000"
+      },
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ],
+      "package": "com.shivam_s.secqrypt"
+    },
+    "web": {
+      "output": "static",
+      "favicon": "./assets/images/secQRypt_logo.png"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SecQrypt to use your camera to scan merchant QR codes.",
+          "barcodeScannerEnabled": true
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#000000",
+          "image": "./assets/images/splash-black.png",
+          "imageWidth": 1
+        }
+      ],
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true,
+      "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "e4a859c1-fc88-4bb3-9681-151a000f1f7c"
+      }
+    }
+  }
+}
