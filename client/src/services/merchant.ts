@@ -12,6 +12,7 @@ export type MerchantVerificationRecord = {
   phoneNumber: string;
   upiId: string;
   shopLocation: string;
+  riskPoints?: number;
   govId?: string;
   qrData: string;
   qrHash?: string;
@@ -29,8 +30,10 @@ export type ConsumerReport = {
   merchantUpiId: string;
   reportReason: MerchantReportReason;
   details: string;
-  status: 'new' | 'reviewing' | 'resolved' | 'dismissed';
+  status: 'pending' | 'on_progress' | 'resolved' | 'dismissed';
   adminNotes?: string;
+  riskPoints?: number;
+  riskPointsApplied?: boolean;
   createdAt?: string;
 };
 
@@ -141,8 +144,25 @@ export async function verifyQr(payload: { qrData: string; qrHash: string }) {
     phoneNumber?: string;
     upiId?: string;
     shopLocation?: string;
+    riskPoints?: number;
   }>('/api/verify/qr', {
     method: 'POST',
     body: JSON.stringify(payload),
+  });
+}
+
+export async function findMerchantByLookup(search: string) {
+  return request<{
+    found: boolean;
+    status: string;
+    message: string;
+    merchantName?: string;
+    merchantId?: string;
+    phoneNumber?: string;
+    upiId?: string;
+    shopLocation?: string;
+    riskPoints?: number;
+  }>(`/api/verify/lookup?search=${encodeURIComponent(search)}`, {
+    method: 'GET',
   });
 }

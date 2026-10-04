@@ -17,11 +17,12 @@ const merchantReportSchema = new mongoose.Schema(
     details: { type: String, trim: true, default: '' },
     status: {
       type: String,
-      enum: ['new', 'reviewing', 'resolved', 'dismissed'],
-      default: 'new',
+      enum: ['pending', 'on_progress', 'resolved', 'dismissed', 'new', 'reviewing'],
+      default: 'pending',
       index: true,
     },
     adminNotes: { type: String, trim: true, default: '' },
+    riskPointsApplied: { type: Boolean, default: false },
   },
   { timestamps: true },
 );

@@ -31,6 +31,7 @@ export type VerificationQueueItem = {
   qrHash: string;
   submittedAt?: string;
   notes?: string;
+  riskPoints: number;
 };
 
 export type MerchantReportItem = {
@@ -43,9 +44,14 @@ export type MerchantReportItem = {
   qrData: string;
   reportReason: 'scam' | 'spam' | 'mismatch' | 'other';
   details: string;
-  status: 'new' | 'reviewing' | 'resolved' | 'dismissed';
+  status: 'pending' | 'on_progress' | 'resolved' | 'dismissed';
   adminNotes?: string;
   createdAt?: string;
+  riskPointsApplied?: boolean;
+  merchantVerificationStatus?: 'pending' | 'verified' | 'invalid' | 'approved' | 'rejected' | 'not_found';
+  merchantRiskPoints?: number;
+  merchantPhoneNumber?: string;
+  merchantShopLocation?: string;
 };
 
 async function request<T>(path: string, options?: RequestInit, token?: string): Promise<T> {
@@ -85,7 +91,7 @@ export async function getMerchantReports(token: string) {
   return request<{ reports: MerchantReportItem[] }>('/api/admin/reports', { method: 'GET' }, token);
 }
 
-export async function resolveMerchantReport(token: string, id: string, status: 'reviewing' | 'resolved' | 'dismissed', notes?: string) {
+export async function resolveMerchantReport(token: string, id: string, status: 'pending' | 'on_progress' | 'resolved' | 'dismissed', notes?: string) {
   return request<{ message: string; report: MerchantReportItem }>(`/api/admin/reports/${id}/resolve`, {
     method: 'POST',
     body: JSON.stringify({ status, notes }),

@@ -19,6 +19,7 @@ function serializeRecord(record) {
     qrData: record.qrData,
     qrHash: record.qrHash,
     verificationStatus: record.verificationStatus,
+    riskPoints: record.riskPoints || 0,
     submittedAt: record.submittedAt,
     notes: record.notes,
   };
@@ -38,6 +39,10 @@ router.post('/report', requireAuth, async (req, res, next) => {
     if (merchantId) {
       relatedMerchantAccount = await User.findOne({ merchantId: String(merchantId).toUpperCase() });
     }
+    if (!relatedMerchantAccount && merchantId) {
+      const merchantRecord = await MerchantVerification.findOne({ merchantId: String(merchantId).toUpperCase() });
+      relatedMerchantAccount = merchantRecord ? await User.findById(merchantRecord.merchantAccountId) : null;
+    }
 
     const report = await MerchantReport.create({
       reportedBy: user._id,
@@ -49,6 +54,7 @@ router.post('/report', requireAuth, async (req, res, next) => {
       reportReason: safeReason,
       details: details ? String(details).trim() : '',
       status: 'new',
+      riskPointsApplied: false,
     });
 
     return res.status(201).json({
@@ -77,7 +83,8 @@ router.get('/reports/mine', requireAuth, async (req, res, next) => {
       merchantUpiId: report.merchantUpiId || '',
       reportReason: report.reportReason,
       details: report.details || '',
-      status: report.status,
+      status: report.status === 'new' ? 'pending' : report.status === 'reviewing' ? 'on_progress' : report.status,
+      riskPointsApplied: report.riskPointsApplied || false,
       adminNotes: report.adminNotes || '',
       createdAt: report.createdAt,
     })) });
@@ -137,6 +144,21 @@ router.post('/apply', requireAuth, async (req, res, next) => {
 
     const existing = await MerchantVerification.findOne({ merchantAccountId: user._id });
 
+    const qrTakenByAnotherMerchant = await MerchantVerification.findOne({
+      $and: [
+        { merchantAccountId: { $ne: user._id } },
+        {
+          $or: [
+            { qrHash: calculatedQrHash },
+            { qrData: normalizedQrData },
+          ],
+        },
+      ],
+    });
+    if (qrTakenByAnotherMerchant) {
+      return res.status(409).json({ message: 'This QR code is already taken by another merchant.' });
+    }
+
     if (existing?.verificationStatus === 'verified' || existing?.verificationStatus === 'approved') {
       return res.status(409).json({ message: 'This merchant is already verified and cannot submit another report.' });
     }
@@ -175,6 +197,45 @@ router.delete('/application', requireAuth, async (req, res, next) => {
 
     await MerchantVerification.deleteOne({ _id: record._id });
     return res.json({ message: 'Verification report removed successfully.' });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.get('/lookup', async (req, res, next) => {
+  try {
+    const search = String(req.query.search || '').trim();
+    const normalizedPhoneNumber = search.replace(/\D/g, '');
+    const isPhoneSearch = normalizedPhoneNumber.length >= 7 && !search.includes('@');
+    const normalizedUpiId = search.toLowerCase();
+    if (!search || (!isPhoneSearch && !search.includes('@'))) {
+      return res.status(400).json({ message: 'Enter a valid merchant phone number or UPI ID' });
+    }
+
+    const approvedRecords = await MerchantVerification.find({ verificationStatus: { $in: ['verified', 'approved'] } });
+    const match = approvedRecords.find((record) => isPhoneSearch
+      ? String(record.phoneNumber || '').replace(/\D/g, '') === normalizedPhoneNumber
+      : String(record.upiId || '').trim().toLowerCase() === normalizedUpiId);
+
+    if (!match) {
+      return res.status(200).json({
+        found: false,
+        status: 'not_registered',
+        message: 'No verified merchant was found for this phone number or UPI ID.',
+      });
+    }
+
+    return res.status(200).json({
+      found: true,
+      status: 'VERIFIED',
+      merchantName: match.merchantName,
+      merchantId: match.merchantId,
+      phoneNumber: match.phoneNumber,
+      upiId: match.upiId,
+      shopLocation: match.shopLocation,
+      riskPoints: match.riskPoints || 0,
+      message: `Verified merchant details matched the registered ${isPhoneSearch ? 'phone number' : 'UPI ID'}.`,
+    });
   } catch (error) {
     return next(error);
   }
@@ -234,6 +295,7 @@ router.post('/qr', async (req, res, next) => {
       phoneNumber: exactMatch.phoneNumber,
       upiId: exactMatch.upiId,
       shopLocation: exactMatch.shopLocation,
+      riskPoints: exactMatch.riskPoints || 0,
       message: 'Verified merchant details matched the registered QR record.',
     });
   } catch (error) {

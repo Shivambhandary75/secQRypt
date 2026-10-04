@@ -19,12 +19,14 @@ function serializeVerification(record) {
     qrHash: record.qrHash || '',
     govId: record.govId || '',
     verificationStatus: record.verificationStatus,
+    riskPoints: record.riskPoints || 0,
     submittedAt: record.submittedAt,
     notes: record.notes || '',
   };
 }
 
-function serializeReport(report) {
+function serializeReport(report, verification = null) {
+  const status = report.status === 'new' ? 'pending' : report.status === 'reviewing' ? 'on_progress' : report.status;
   return {
     id: report._id.toString(),
     reportedBy: report.reportedBy?.toString?.() || report.reportedBy,
@@ -35,7 +37,12 @@ function serializeReport(report) {
     qrData: report.qrData || '',
     reportReason: report.reportReason,
     details: report.details || '',
-    status: report.status,
+    status,
+    riskPointsApplied: report.riskPointsApplied || false,
+    merchantVerificationStatus: verification?.verificationStatus || 'not_found',
+    merchantRiskPoints: verification?.riskPoints || 0,
+    merchantPhoneNumber: verification?.phoneNumber || '',
+    merchantShopLocation: verification?.shopLocation || '',
     adminNotes: report.adminNotes || '',
     createdAt: report.createdAt,
   };
@@ -52,7 +59,7 @@ router.get('/overview', requireAuth, async (req, res, next) => {
       MerchantVerification.countDocuments({ verificationStatus: 'pending' }),
       MerchantVerification.countDocuments({ verificationStatus: { $in: ['verified', 'approved'] } }),
       MerchantVerification.countDocuments({ verificationStatus: { $in: ['invalid', 'rejected'] } }),
-      MerchantReport.countDocuments({ status: { $in: ['new', 'reviewing'] } }),
+      MerchantReport.countDocuments({ status: { $in: ['pending', 'on_progress', 'new', 'reviewing'] } }),
     ]);
 
     return res.json({
@@ -130,7 +137,20 @@ router.get('/reports', requireAuth, async (req, res, next) => {
     }
 
     const reports = await MerchantReport.find().sort({ createdAt: -1 });
-    return res.json({ reports: reports.map(serializeReport) });
+    const verifications = await MerchantVerification.find({
+      $or: [
+        { merchantAccountId: { $in: reports.map((report) => report.merchantAccountId).filter(Boolean) } },
+        { merchantId: { $in: reports.map((report) => report.merchantId).filter(Boolean) } },
+      ],
+    });
+    const verificationByAccount = new Map(verifications.map((record) => [record.merchantAccountId.toString(), record]));
+    const verificationByMerchantId = new Map(verifications.map((record) => [record.merchantId, record]));
+
+    return res.json({ reports: reports.map((report) => serializeReport(
+      report,
+      (report.merchantAccountId && verificationByAccount.get(report.merchantAccountId.toString()))
+        || verificationByMerchantId.get(report.merchantId),
+    )) });
   } catch (error) {
     return next(error);
   }
@@ -144,7 +164,13 @@ router.post('/reports/:id/resolve', requireAuth, async (req, res, next) => {
     }
 
     const { status, notes } = req.body || {};
-    const nextStatus = ['reviewing', 'resolved', 'dismissed'].includes(status) ? status : 'resolved';
+    const nextStatus = ['pending', 'on_progress', 'resolved', 'dismissed'].includes(status)
+      ? status
+      : status === 'reviewing'
+        ? 'on_progress'
+        : status === 'new'
+          ? 'pending'
+          : 'pending';
 
     const report = await MerchantReport.findById(req.params.id);
     if (!report) {
@@ -155,9 +181,23 @@ router.post('/reports/:id/resolve', requireAuth, async (req, res, next) => {
     report.adminNotes = notes ? String(notes).trim() : report.adminNotes || '';
     await report.save();
 
+    if (nextStatus === 'resolved' && !report.riskPointsApplied && report.merchantAccountId) {
+      await MerchantVerification.findOneAndUpdate(
+        { merchantAccountId: report.merchantAccountId },
+        { $inc: { riskPoints: 1 } },
+      );
+      report.riskPointsApplied = true;
+      await report.save();
+    }
+
     return res.json({
       message: 'Report updated successfully.',
-      report: serializeReport(report),
+      report: serializeReport(report, await MerchantVerification.findOne({
+        $or: [
+          { merchantAccountId: report.merchantAccountId },
+          { merchantId: report.merchantId },
+        ],
+      })),
     });
   } catch (error) {
     return next(error);

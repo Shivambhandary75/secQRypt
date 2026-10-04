@@ -17,6 +17,7 @@ const merchantVerificationSchema = new mongoose.Schema(
       default: 'pending',
       index: true,
     },
+    riskPoints: { type: Number, default: 0, min: 0 },
     submittedAt: { type: Date, default: Date.now },
     notes: { type: String, trim: true },
   },

@@ -32,6 +32,7 @@ export default function ScannerScreen() {
     phoneNumber?: string;
     upiId?: string;
     shopLocation?: string;
+    riskPoints?: number;
   }>(null);
 
   const handleScan = async ({ data }: BarcodeScanningResult) => {
@@ -177,6 +178,9 @@ export default function ScannerScreen() {
                 <Text className="text-sm text-black/70">UPI ID: {result.upiId}</Text>
                 <Text className="text-sm text-black/70">Location: {result.shopLocation}</Text>
                 <Text className="mt-4 text-sm font-extrabold text-green-700">Status: {result.status}</Text>
+                <Text className={`mt-2 text-sm font-extrabold ${result.riskPoints ? 'text-red-700' : 'text-green-700'}`}>
+                  Government risk points: {result.riskPoints || 0}
+                </Text>
               </>
             ) : (
               <>
@@ -185,13 +189,11 @@ export default function ScannerScreen() {
               </>
             )}
 
-            {!result?.verified && (
-              <Pressable onPress={() => setReporting((value) => !value)} className="mt-4 items-center bg-red-500 py-3">
-                <Text className="text-sm font-extrabold text-white">{reporting ? 'Hide report form' : 'Report this merchant'}</Text>
-              </Pressable>
-            )}
+            <Pressable onPress={() => setReporting((value) => !value)} className="mt-4 items-center bg-red-500 py-3">
+              <Text className="text-sm font-extrabold text-white">{reporting ? 'Hide report form' : 'Report this merchant'}</Text>
+            </Pressable>
 
-            {reporting && !result?.verified && (
+            {reporting && (
               <View className="mt-4 gap-3">
                 <Text className="text-xs font-bold uppercase tracking-wider text-black">Report reason</Text>
                 <View className="flex-row flex-wrap gap-2">
