@@ -12,7 +12,7 @@ const merchantVerificationSchema = new mongoose.Schema(
     qrHash: { type: String, trim: true, lowercase: true },
     verificationStatus: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
+      enum: ['pending', 'verified', 'invalid', 'approved', 'rejected'],
       default: 'pending',
       index: true,
     },

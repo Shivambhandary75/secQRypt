@@ -49,8 +49,8 @@ router.get('/overview', requireAuth, async (req, res, next) => {
 
     const [pendingCount, approvedCount, rejectedCount, openReports] = await Promise.all([
       MerchantVerification.countDocuments({ verificationStatus: 'pending' }),
-      MerchantVerification.countDocuments({ verificationStatus: 'approved' }),
-      MerchantVerification.countDocuments({ verificationStatus: 'rejected' }),
+      MerchantVerification.countDocuments({ verificationStatus: { $in: ['verified', 'approved'] } }),
+      MerchantVerification.countDocuments({ verificationStatus: { $in: ['invalid', 'rejected'] } }),
       MerchantReport.countDocuments({ status: { $in: ['new', 'reviewing'] } }),
     ]);
 
@@ -89,24 +89,31 @@ router.post('/verification/:id/decision', requireAuth, async (req, res, next) =>
     }
 
     const { decision, notes } = req.body || {};
-    const nextDecision = decision === 'approved' ? 'approved' : 'rejected';
+    if (!['verified', 'invalid'].includes(decision)) {
+      return res.status(400).json({ message: 'Decision must be verified or invalid' });
+    }
+
+    const existingRecord = await MerchantVerification.findById(req.params.id);
+    if (!existingRecord) {
+      return res.status(404).json({ message: 'Verification request not found' });
+    }
+    if (existingRecord.verificationStatus === 'verified' || existingRecord.verificationStatus === 'approved') {
+      return res.status(409).json({ message: 'A verified merchant report cannot be changed.' });
+    }
 
     const record = await MerchantVerification.findByIdAndUpdate(
       req.params.id,
       {
         $set: {
-          verificationStatus: nextDecision,
+          verificationStatus: decision,
           ...(notes ? { notes: String(notes).trim() } : {}),
         },
       },
       { new: true, runValidators: true },
     );
-    if (!record) {
-      return res.status(404).json({ message: 'Verification request not found' });
-    }
 
     return res.json({
-      message: `Verification request ${nextDecision}.`,
+      message: `Verification report marked ${decision}.`,
       record: serializeVerification(record),
     });
   } catch (error) {
